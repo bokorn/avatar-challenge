@@ -1,0 +1,16 @@
+# Goal
+geometry_msgs/Transform transform
+avatar_challenge_msgs/Point2D[] points
+float32 speed_scaling
+
+---
+# Result
+bool success
+string message
+float32 duration
+int32 points_drawn
+
+---
+# Feedback
+int32 current_point
+float32 fraction_completed
