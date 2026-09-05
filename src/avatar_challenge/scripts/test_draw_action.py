@@ -148,9 +148,10 @@ def main(argv=sys.argv[1:]):
     world_points = shape_to_world_points(shape, transform_mat)
     client.publish_vertex_markers(world_points)
 
-    # res = client.send_goal(transform, points, speed=0.2)
-    # if res is not None:
-    #     print('Result:', res.success, res.message, res.duration, res.points_drawn)
+    res = client.send_goal(transform, points, speed=0.2)
+    if res is not None:
+        print('Result:', res.success, res.message, res.duration, res.points_drawn)
+    rclpy.spin(client)
     client.destroy_node()
     rclpy.shutdown()
 
