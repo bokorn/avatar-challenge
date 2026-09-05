@@ -11,6 +11,5 @@ float32 duration
 int32 points_drawn
 
 ---
-# Feedback
-int32 current_point
-float32 fraction_completed
+# The internal state that the move group action currently is in
+string state

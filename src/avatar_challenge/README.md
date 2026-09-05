@@ -1,6 +1,6 @@
 # avatar_challenge
 
-This package provides `draw_node`, a ROS2 action server that accepts a 2D shape
+This package provides `draw_node`, a ROS2 service server that accepts a 2D shape
 (as a list of points) plus a `geometry_msgs/Transform` describing where to draw
 it, and executes a straight-line end-effector Cartesian trajectory through
 MoveIt2's `move_group` (via its native `compute_cartesian_path` service and
@@ -62,7 +62,7 @@ ros2 launch avatar_challenge draw.launch.py
 
 ## Test
 
-With the launch running, send a goal from a YAML shape file:
+With the launch running, call the draw service using a YAML shape file:
 ```bash
 ros2 run avatar_challenge test_draw_action.py <path/to/shape.yaml>
 ```
