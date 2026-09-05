@@ -5,20 +5,17 @@ import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionServer, ActionClient
 
-from geometry_msgs.msg import Point, Pose, Quaternion, Transform
+from geometry_msgs.msg import Transform
 
-from moveit_msgs.srv import GetCartesianPath, GetPositionFK
-from moveit_msgs.action import ExecuteTrajectory, MoveGroup
-
-from spatialmath import SE3, SO3
-from spatialmath.base import q2r
-import numpy as np
+from moveit_msgs.srv import GetCartesianPath
+from moveit_msgs.action import ExecuteTrajectory
 
 from avatar_challenge_msgs.action import Draw
 from avatar_challenge_msgs.msg import Point2D
 from avatar_challenge.geometry import path_to_markers, transform_vertices
 
 class DrawNode(Node):
+    """Node responsible for handling the drawing action, planning Cartesian paths, and visualizing the drawing vertices."""
     def __init__(self):
         super().__init__('draw_node')
 
@@ -46,6 +43,14 @@ class DrawNode(Node):
         self._marker_pub = self.create_publisher(MarkerArray, 'drawing_markers', marker_qos)
         
     def ensure_clients(self, timeout_sec: float = 5.0) -> bool:
+        """Ensure that the required ROS 2 service and action server are available.
+        
+        Args:
+            timeout_sec (float): The maximum time to wait for the service and action server to become available, in seconds.
+        
+        Returns:
+            bool: True if both the service and action server are available, False otherwise.
+        """
         if not self.cartesian_path_client.wait_for_service(timeout_sec=timeout_sec):
             self.get_logger().error('compute_cartesian_path service not available')
             return False
@@ -58,7 +63,20 @@ class DrawNode(Node):
         self,
         world_T_drawing_tf: Transform,
         drawing_p_vertices_2d: list[Point2D],
-    ):
+    ) -> GetCartesianPath.Response:
+        """Plan a Cartesian path for the drawing action.
+
+        This method transforms the 2D drawing vertices into 3D world coordinates,
+        publishes them as markers for visualization, and then requests a Cartesian
+        path from the MoveIt service based on these waypoints.
+
+        Args:
+            world_T_drawing_tf (Transform): The transform from the drawing frame to the world frame.
+            drawing_p_vertices_2d (list[Point2D]): The 2D vertices of the drawing shape.
+
+        Returns:
+            GetCartesianPath.Response: The response from the compute_cartesian_path service.
+        """
         world_p_vertices = transform_vertices(world_T_drawing_tf, drawing_p_vertices_2d)
         self._marker_pub.publish(path_to_markers(world_p_vertices, frame_id='world', timestamp=self.get_clock().now().to_msg()))
         
@@ -76,7 +94,15 @@ class DrawNode(Node):
         
         return response
     
-    async def execute_callback(self, drawing_handle):
+    async def execute_callback(self, drawing_handle: ActionServer) -> Draw.Result:
+        """Handle the execution of a draw action goal.
+
+        Args:
+            drawing_handle (ActionServer): The action server handling the draw goal.
+
+        Returns:
+            Draw.Result: The result of the draw action execution.
+        """
         drawing_req = drawing_handle.request
         self.get_logger().info(f'Accepted draw goal with {len(drawing_req.points)} points')
 
@@ -125,8 +151,7 @@ class DrawNode(Node):
             exec_result_future = exec_goal_handle.get_result_async()
             exec_result = await exec_result_future
 
-            feedback_msg.current_point = len(drawing_req.points)
-            feedback_msg.fraction_completed = 1.0
+            feedback_msg.state = 'cleanup'
             drawing_handle.publish_feedback(feedback_msg)
 
             if exec_result.result.error_code.val == 1:

@@ -6,26 +6,33 @@ import numpy as np
 import rclpy
 from rclpy.action import ActionClient
 from rclpy.node import Node
-from rclpy.qos import QoSProfile, QoSDurabilityPolicy, QoSReliabilityPolicy
 
-from geometry_msgs.msg import Point, Transform
-from visualization_msgs.msg import Marker, MarkerArray
+from geometry_msgs.msg import Transform
 from ament_index_python.packages import get_package_share_directory
 
 from avatar_challenge_msgs.action import Draw
 from avatar_challenge_msgs.msg import Point2D
 
-from spatialmath import SE3
 from avatar_challenge.geometry import matrix_to_transform
 
 
 
 class DrawClient(Node):
+    """Client node for sending drawing goals to the Draw action server."""
     def __init__(self):
         super().__init__('draw_client')
         self._client = ActionClient(self, Draw, 'draw')
 
-    def send_goal(self, world_T_drawing: Transform, drawing_p_points: list[Point2D]):
+    def send_goal(self, world_T_drawing: Transform, drawing_p_points: list[Point2D]) -> Draw.Result:
+        """Send a drawing goal to the Draw action server and wait for the result.
+
+        Args:
+            world_T_drawing (Transform): The transform from the drawing frame to the world frame.
+            drawing_p_points (list[Point2D]): The 2D points defining the drawing shape.
+
+        Returns:
+            Draw.Result: The result of the drawing action.
+        """
         goal_msg = Draw.Goal()
         goal_msg.transform = world_T_drawing
         goal_msg.points = drawing_p_points
@@ -44,7 +51,15 @@ class DrawClient(Node):
         result = get_result_future.result().result
         return result
 
-def load_goal_from_yaml(yaml_file):
+def load_goal_from_yaml(yaml_file) -> tuple[Transform, list[Point2D]]:
+    """Load a drawing goal from a YAML file.
+
+    Args:
+        yaml_file (str): The path to the YAML file containing the drawing goal.
+
+    Returns:
+        tuple[Transform, list[Point2D]]: The transform from the drawing frame to the world frame and the list of 2D points defining the drawing shape.
+    """
     with open(yaml_file, 'r') as f:
         data = yaml.safe_load(f)
 
@@ -65,8 +80,6 @@ def main(argv=sys.argv[1:]):
 
     world_T_drawing, drawing_p_points = load_goal_from_yaml(yaml_file)
     print(f'Loaded goal from {yaml_file}')
-    print(f'Transform: {world_T_drawing}')
-    print(f'Points: {drawing_p_points}')
 
     res = client.send_goal(world_T_drawing, drawing_p_points)
     if res is not None:

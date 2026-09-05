@@ -5,57 +5,87 @@ from avatar_challenge_msgs.msg import Point2D
 import numpy as np
 import numpy.typing as npt
 from visualization_msgs.msg import Marker, MarkerArray
+from builtin_interfaces.msg import Time
 
 def transform_to_se3(transform: Transform) -> SE3:
-    """Convert a geometry_msgs/Transform's quaternion into a spatialmath SO3."""
+    """Convert a geometry_msgs/Transform's quaternion into a spatialmath SO3.
+    
+    Args:
+        transform (Transform): The geometry_msgs/Transform to convert.
+
+    Returns:
+        SE3: The corresponding spatialmath SE3 object.
+    """
     q = transform.rotation
     R = q2r([q.w, q.x, q.y, q.z], order='sxyz')
     t = [transform.translation.x, transform.translation.y, transform.translation.z]
     return SE3.Rt(R, t, check=False)
 
 def transform_vertices(
-    robot_T_drawing_tf: Transform,
+    world_T_drawing_tf: Transform,
     drawing_p_vertices_2d: list[Point2D],
 ) -> list[Pose]:
     """Transform 2D shape points (x, y) into 3D Pose waypoints using the
-    given transform's position mapping (only position varies along the path)."""
-    robot_T_drawing = transform_to_se3(robot_T_drawing_tf)
+    given transform's position mapping (only position varies along the path).
+
+    Args:
+        world_T_drawing_tf (Transform): The transform from the drawing frame to the world frame.
+        drawing_p_vertices_2d (list[Point2D]): The 2D vertices of the drawing shape.
+
+    Returns:
+        list[Pose]: The corresponding 3D Pose waypoints in the world frame.
+    """
+    world_T_drawing = transform_to_se3(world_T_drawing_tf)
 
     drawing_p_vertices = np.array([[p.x, p.y, 0.0] for p in drawing_p_vertices_2d], dtype=float)
-    robot_p_vertices = (robot_T_drawing * drawing_p_vertices.T).T
+    world_p_vertices = (world_T_drawing * drawing_p_vertices.T).T
 
-    poses = []
-    for robot_p_vert in robot_p_vertices:
+    world_p_poses = []
+    for world_p_vert in world_p_vertices:
         pose = Pose()
-        pose.position.x = float(robot_p_vert[0])
-        pose.position.y = float(robot_p_vert[1])
-        pose.position.z = float(robot_p_vert[2])
-        pose.orientation = robot_T_drawing_tf.rotation
-        poses.append(pose)
+        pose.position.x = float(world_p_vert[0])
+        pose.position.y = float(world_p_vert[1])
+        pose.position.z = float(world_p_vert[2])
+        pose.orientation = world_T_drawing_tf.rotation
+        world_p_poses.append(pose)
         
-    return poses
+    return world_p_poses
 
-def matrix_to_transform(robot_T_drawing_np: npt.NDArray) -> Transform:
-    """Convert a 4x4 nested-list matrix into a geometry_msgs/Transform."""
-    robot_T_drawing_se3 = SE3(robot_T_drawing_np, check=False)
-    q = robot_T_drawing_se3.UnitQuaternion()
+def matrix_to_transform(world_T_drawing_np: npt.NDArray) -> Transform:
+    """Convert a 4x4 nested-list matrix into a geometry_msgs/Transform.
 
-    robot_T_drawing = Transform()
-    robot_T_drawing.translation.x = float(robot_T_drawing_np[0][3])
-    robot_T_drawing.translation.y = float(robot_T_drawing_np[1][3])
-    robot_T_drawing.translation.z = float(robot_T_drawing_np[2][3])
+    Args:
+        world_T_drawing_np (npt.NDArray): The 4x4 transformation matrix representing the pose of the drawing frame in the world frame.
 
-    robot_T_drawing.rotation.x = float(q.v[0])
-    robot_T_drawing.rotation.y = float(q.v[1])
-    robot_T_drawing.rotation.z = float(q.v[2])
-    robot_T_drawing.rotation.w = float(q.s)
+    Returns:
+        Transform: The corresponding geometry_msgs/Transform object.
+    """
+    world_T_drawing_se3 = SE3(world_T_drawing_np, check=False)
+    q = world_T_drawing_se3.UnitQuaternion()
 
-    return robot_T_drawing
+    world_T_drawing = Transform()
+    world_T_drawing.translation.x = float(world_T_drawing_np[0][3])
+    world_T_drawing.translation.y = float(world_T_drawing_np[1][3])
+    world_T_drawing.translation.z = float(world_T_drawing_np[2][3])
 
-def path_to_markers(points: list[Pose], frame_id: str = 'world', timestamp=None):
-    """Publish the shape's vertices (and the straight-line path between
-    them) as RViz markers so they can be visually compared against the
-    arm's actual executed path."""
+    world_T_drawing.rotation.x = float(q.v[0])
+    world_T_drawing.rotation.y = float(q.v[1])
+    world_T_drawing.rotation.z = float(q.v[2])
+    world_T_drawing.rotation.w = float(q.s)
+
+    return world_T_drawing
+
+def path_to_markers(points: list[Pose], frame_id: str = 'world', timestamp: Time =None):
+    """Convert a list of 3D Pose waypoints into RViz markers for visualization.
+
+    Args:
+        points (list[Pose]): The 3D Pose waypoints to visualize.
+        frame_id (str, optional): The reference frame for the markers. Defaults to 'world'.
+        timestamp (Time, optional): The timestamp for the markers. Defaults to None.
+
+    Returns:
+        MarkerArray: The RViz markers representing the points and the connecting path.
+    """
     
     points_marker = Marker()
     points_marker.header.frame_id = frame_id

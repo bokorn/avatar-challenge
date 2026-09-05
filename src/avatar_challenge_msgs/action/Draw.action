@@ -1,15 +1,19 @@
-# Goal
+# Transform from flat drawing to 3D drawing plane
 geometry_msgs/Transform transform
+
+# 2D vertices to draw
 avatar_challenge_msgs/Point2D[] points
-float32 speed_scaling
 
 ---
 # Result
 bool success
+
+# Result status message
 string message
+
+# Duration of action
 float32 duration
-int32 points_drawn
 
 ---
-# The internal state that the move group action currently is in
+# Internal state of drawing
 string state
