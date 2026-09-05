@@ -8,7 +8,7 @@ ament_python_install_package(${PROJECT_NAME} PACKAGE_DIR src/${PROJECT_NAME})
 
 install(PROGRAMS
   scripts/draw_node
-  scripts/test_draw_action.py
+  scripts/request_drawing.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

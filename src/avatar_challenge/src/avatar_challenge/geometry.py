@@ -6,6 +6,7 @@ import numpy as np
 import numpy.typing as npt
 from visualization_msgs.msg import Marker, MarkerArray
 from builtin_interfaces.msg import Time
+from scipy.interpolate import splprep, splev
 
 def transform_to_se3(transform: Transform) -> SE3:
     """Convert a geometry_msgs/Transform's quaternion into a spatialmath SO3.
@@ -120,3 +121,86 @@ def path_to_markers(points: list[Pose], frame_id: str = 'world', timestamp: Time
     line_marker.points = list(points_marker.points) + [points_marker.points[0]]
 
     return MarkerArray(markers=[points_marker, line_marker])
+
+def compute_circle_center(start_point: tuple[float, float], end_point: tuple[float, float], signed_radius: float) -> tuple[float, float]:
+    """Compute the center of a circle given two points on its circumference and the signed radius.
+
+    Args:
+        start_point (tuple[float, float]): The starting point on the circle (x, y).
+        end_point (tuple[float, float]): The ending point on the circle (x, y).
+        signed_radius (float): The signed radius of the circle. Positive for counter-clockwise arcs, negative for clockwise arcs.
+
+    Returns:
+        tuple[float, float]: The coordinates of the circle center (x, y).
+    """
+    x0, y0 = start_point
+    x1, y1 = end_point
+    dx, dy = x1 - x0, y1 - y0
+    q = np.sqrt(dx**2 + dy**2)
+    if q == 0:
+        raise ValueError("Start point and end point cannot be the same")
+    # midpoint between start and end points
+    mx, my = (x0 + x1) / 2, (y0 + y1) / 2
+    # distance from midpoint to center
+    d = np.sqrt(signed_radius**2 - (q / 2)**2)
+    # direction vector perpendicular to the line segment
+    perp_dx, perp_dy = -dy / q, dx / q
+    # two possible centers
+    cx1, cy1 = mx + d * perp_dx, my + d * perp_dy
+    cx2, cy2 = mx - d * perp_dx, my - d * perp_dy
+    # choose the center based on the sign of the radius
+    if signed_radius > 0:
+        return cx1, cy1
+    else:
+        return cx2, cy2
+        
+def compute_circular_arc(start_point: tuple[float, float], end_point: tuple[float, float], signed_radius: float, resolution: float = 0.1) -> np.ndarray:
+   
+    """Compute the coordinates of a circular arc.
+
+    Args:
+        start_point (tuple[float, float]): The starting point of the arc (x, y).
+        end_point (tuple[float, float]): The ending point of the arc (x, y).
+        signed_radius (float): The signed radius of the circular arc. Positive for counter-clockwise arcs, negative for clockwise arcs.
+        resolution (float, optional): The spacial resolution of the points along the arc in units of arc length. Defaults to 0.1.
+
+    Returns:
+        tuple[np.ndarray, np.ndarray]: The x and y coordinates of the points along the arc.
+    """
+    
+    x0, y0 = start_point
+    x1, y1 = end_point
+    xc, yc = compute_circle_center(start_point, end_point, signed_radius)
+    
+    radius = np.sqrt((x0 - xc)**2 + (y0 - yc)**2)
+    start_angle = np.arctan2(y0 - yc, x0 - xc)
+    end_angle = np.arctan2(y1 - yc, x1 - xc)
+    sweep_angle = end_angle - start_angle
+    if signed_radius < 0 and sweep_angle > 0:
+        sweep_angle -= 2 * np.pi
+    elif signed_radius > 0 and sweep_angle < 0:
+        sweep_angle += 2 * np.pi
+    num_points = max(int(np.abs(sweep_angle) * radius / resolution), 2)
+    angles = np.linspace(start_angle, start_angle + sweep_angle, num_points)
+    
+    arc_x = xc + radius * np.cos(angles)
+    arc_y = yc + radius * np.sin(angles)
+    
+    return np.stack((arc_x, arc_y), axis=-1)
+
+def compute_b_spline(control_points: np.ndarray, resolution: float = 0.1) -> np.ndarray:
+    """Compute a B-spline curve from control points.
+
+    Args:
+        control_points (np.ndarray): An array of control points of shape (N, 2), where N is the number of control points.
+        resolution (float, optional): The spacial resolution of the points along the B-spline curve in units of arc length. Defaults to 0.1.
+
+    Returns:
+        np.ndarray: An array of points along the B-spline curve of shape (num_points, 2).
+    """
+
+    tck, _ = splprep(control_points.T, s=0)
+    num_points = max(int(np.linalg.norm(np.diff(control_points, axis=0), axis=1).sum() / resolution), 2)
+    u_new = np.linspace(0, 1, num_points)
+    x_new, y_new = splev(u_new, tck)
+    return np.vstack((x_new, y_new)).T

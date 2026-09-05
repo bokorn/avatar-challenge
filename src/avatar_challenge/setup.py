@@ -9,8 +9,8 @@ setup(
     package_dir={'': 'src'},
     install_requires=['spatialmath-python'],
     zip_safe=True,
-    author='Your Name',
-    author_email='youremail@domain.com',
+    author='Brian Okorn',
+    author_email='brian.e.okorn@gmail.com',
     description='Avatar Challenge Python package',
     entry_points={
         'console_scripts': [

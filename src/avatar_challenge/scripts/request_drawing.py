@@ -13,7 +13,7 @@ from ament_index_python.packages import get_package_share_directory
 from avatar_challenge_msgs.action import Draw
 from avatar_challenge_msgs.msg import Point2D
 
-from avatar_challenge.geometry import matrix_to_transform
+from avatar_challenge.geometry import compute_circular_arc, matrix_to_transform, compute_b_spline
 
 
 
@@ -65,9 +65,44 @@ def load_goal_from_yaml(yaml_file) -> tuple[Transform, list[Point2D]]:
 
     shape = data.get('shape', [])
     world_T_drawing_np = np.array(data.get('transform', [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]))
-
-    drawing_p_points = [Point2D(x=float(p[0]), y=float(p[1])) for p in shape]
     world_T_drawing = matrix_to_transform(world_T_drawing_np)
+    
+    drawing_p_points = []
+    prev_point = None
+    for i, p in enumerate(shape):
+        if p[0] == 'v':
+            if len(p) != 3:
+                raise ValueError(f"Vertex at index {i} must have 2 coordinates")
+            drawing_p_points.append(Point2D(x=float(p[1]), y=float(p[2])))
+            prev_point = np.array([float(p[1]), float(p[2])])
+            
+        elif p[0] == 'a':
+            if len(p) != 4:
+                raise ValueError(f"Arc at index {i} must have 3 coordinates and a radius")
+            if prev_point is None:
+                raise ValueError(f"Arc at index {i} must be preceded by a vertex")
+            
+            end_point = np.array([float(p[1]), float(p[2])])
+            arc_points = compute_circular_arc(prev_point, end_point, float(p[3]), 0.01)
+            print(f"Computed arc points from {prev_point} to {end_point} with radius {p[3]}: {arc_points}")
+            drawing_p_points.extend([Point2D(x=pt[0], y=pt[1]) for pt in arc_points])
+            prev_point = end_point
+        
+        elif p[0] == 'b':
+            if (len(p)-1) % 2 != 0:
+                raise ValueError(f"B-spline curve at index {i} must have an even number of coordinates after the 'b'")
+            if prev_point is None:
+                raise ValueError(f"B-spline curve at index {i} must be preceded by a vertex")
+            
+            control_points = [np.array([float(p[j]), float(p[j+1])]) for j in range(1, len(p), 2)]
+            control_points = np.concatenate([prev_point[np.newaxis, :], control_points])
+            b_spline_points = compute_b_spline(control_points, 0.01)
+            print(f"Computed B-spline points from {prev_point} with control points {control_points}: {b_spline_points}")
+            drawing_p_points.extend([Point2D(x=pt[0], y=pt[1]) for pt in b_spline_points])
+            prev_point = control_points[-1]
+        else:
+            raise ValueError(f"Unknown shape type '{p[0]}' at index {i}")
+    
     return world_T_drawing, drawing_p_points
 
 def main(argv=sys.argv[1:]):
@@ -79,7 +114,7 @@ def main(argv=sys.argv[1:]):
         yaml_file = os.path.join(get_package_share_directory('avatar_challenge'), yaml_file)
 
     world_T_drawing, drawing_p_points = load_goal_from_yaml(yaml_file)
-    print(f'Loaded goal from {yaml_file}')
+    print(f'Loaded goal from {yaml_file} with {len(drawing_p_points)} points')
 
     res = client.send_goal(world_T_drawing, drawing_p_points)
     if res is not None:
