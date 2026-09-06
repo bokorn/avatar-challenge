@@ -15,6 +15,7 @@ setup(
     entry_points={
         'console_scripts': [
             'draw_node = avatar_challenge.draw_node:main',
+            'request_drawing = avatar_challenge.request_drawing:main'
         ],
     },
 )

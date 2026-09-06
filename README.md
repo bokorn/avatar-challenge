@@ -11,10 +11,17 @@ command-line client is `request_drawing.py`.
 
 ## Installation
 
+```bash
+cd ~ 
+git clone git@github.com:bokorn/avatar-challenge.git
+```
+
 ### Python dependencies
 
 ```bash
-python3 -m pip install spatialmath-python numpy scipy PyYAML
+sudo apt update && sudo apt install python3-pip
+
+pip3 install spatialmath-python[ros-humble]
 ```
 
 Source the workspaces in this order:
@@ -22,7 +29,7 @@ Source the workspaces in this order:
 ```bash
 source /opt/ros/humble/setup.bash
 source ~/xarm_ws/install/setup.bash
-source ~/dev_ws/install/setup.bash
+source ~/avatar-challenge/install/setup.bash
 ```
 
 ## Build
@@ -42,14 +49,11 @@ Launch the fake xArm7 hardware, MoveIt 2, and the drawing action server:
 ros2 launch avatar_challenge start.launch.py
 ```
 
-This also starts RViz through the xArm MoveIt configuration. In a headless
-container.
-
 After `draw_node action server ready` appears, send the default example from a
 second sourced shell:
 
 ```bash
-ros2 run avatar_challenge request_drawing.py
+ros2 run avatar_challenge request_drawing
 ```
 
 Send another YAML file with:
