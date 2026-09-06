@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import argparse
 import sys
 import os
 import yaml
@@ -106,10 +107,15 @@ def load_goal_from_yaml(yaml_file) -> tuple[Transform, list[Point2D]]:
     return world_T_drawing, drawing_p_points
 
 def main(argv=sys.argv[1:]):
+    parser = argparse.ArgumentParser(description='Request a drawing from the avatar challenge.')
+    parser.add_argument('yaml_file', nargs='?', default='config/shape_example.yaml', help='Path to the YAML file containing the shape')
+    args = parser.parse_args()
+    
+    
     rclpy.init()
     client = DrawClient()
 
-    yaml_file = argv[0] if len(argv) > 0 else 'config/shape_example.yaml'
+    yaml_file = args.yaml_file
     if not os.path.isabs(yaml_file):
         yaml_file = os.path.join(get_package_share_directory('avatar_challenge'), yaml_file)
 
