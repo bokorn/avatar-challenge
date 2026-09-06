@@ -88,6 +88,9 @@ def path_to_markers(points: list[Pose], frame_id: str = 'world', timestamp: Time
         MarkerArray: The RViz markers representing the points and the connecting path.
     """
     
+    if not points:
+        return MarkerArray()
+
     points_marker = Marker()
     points_marker.header.frame_id = frame_id
     if timestamp is not None:
@@ -139,6 +142,8 @@ def compute_circle_center(start_point: tuple[float, float], end_point: tuple[flo
     q = np.sqrt(dx**2 + dy**2)
     if q == 0:
         raise ValueError("Start point and end point cannot be the same")
+    if abs(signed_radius) < q / 2:
+        raise ValueError("The absolute radius must be at least half the chord length")
     # midpoint between start and end points
     mx, my = (x0 + x1) / 2, (y0 + y1) / 2
     # distance from midpoint to center
